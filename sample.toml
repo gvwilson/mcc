@@ -1,0 +1,13 @@
+[project]
+name = "mccole"
+version = "0.1.0"
+description = "a simple static site generator"
+readme = "README.md"
+authors = [
+    { name = "Greg Wilson", email = "gvwilson@third-bit.com" }
+]
+requires-python = ">=3.11"
+dependencies = ["click", "tomli"]
+
+[tool.mccole]
+skips = []
