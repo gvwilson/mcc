@@ -1,21 +1,9 @@
 """Command-line interface for McCole."""
 
-from pathlib import Path
-import tomli
 import click
 
-from . import util
-
-
-def read_config(config_file):
-    """Read configuration from TOML file."""
-    if not config_file.exists():
-        raise click.FileError(str(config_file), hint="File not found")
-    
-    with config_file.open("rb") as f:
-        toml_dict = tomli.load(f)
-    
-    return toml_dict.get("tool", {}).get("mccole", {})
+from .build import do_build
+from .check import do_check
 
 
 @click.group()
@@ -27,27 +15,21 @@ def cli():
 @cli.command()
 @click.option("--config", type=click.Path(exists=True), help="Path to config file")
 @click.option("--verbose", is_flag=True, help="Enable verbose output")
-def build(config, verbose):
+@click.option("--src", type=click.Path(), help="Source directory path")
+@click.option("--dst", type=click.Path(), help="Destination directory path")
+def build(config, verbose, src, dst):
     """Build the site."""
-    config_file = Path(config) if config else util.DEFAULT_CONFIG_PATH
-    config_dict = read_config(config_file)
-    
-    click.echo(f"Building site (verbose={verbose})")
-    click.echo(f"Using config from {config_file}")
-    click.echo(f"Config: {config_dict}")
+    do_build(config, verbose, src, dst)
 
 
 @cli.command()
 @click.option("--config", type=click.Path(exists=True), help="Path to config file")
 @click.option("--verbose", is_flag=True, help="Enable verbose output")
-def check(config, verbose):
+@click.option("--src", type=click.Path(), help="Source directory path")
+@click.option("--dst", type=click.Path(), help="Destination directory path")
+def check(config, verbose, src, dst):
     """Check the site for errors."""
-    config_file = Path(config) if config else util.DEFAULT_CONFIG_PATH
-    config_dict = read_config(config_file)
-    
-    click.echo(f"Checking site (verbose={verbose})")
-    click.echo(f"Using config from {config_file}")
-    click.echo(f"Config: {config_dict}")
+    do_check(config, verbose, src, dst)
 
 
 @cli.command()

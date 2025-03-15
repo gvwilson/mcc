@@ -7,7 +7,7 @@ authors = [
     { name = "Greg Wilson", email = "gvwilson@third-bit.com" }
 ]
 requires-python = ">=3.11"
-dependencies = ["click", "tomli"]
+dependencies = ["click", "tomli", "ruff"]
 
 [project.scripts]
 mccole = "mccole:main"
