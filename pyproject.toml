@@ -7,7 +7,7 @@ authors = [
     { name = "Greg Wilson", email = "gvwilson@third-bit.com" }
 ]
 requires-python = ">=3.11"
-dependencies = ["click", "tomli", "ruff", "markdown"]
+dependencies = ["click", "tomli", "ruff", "markdown", "beautifulsoup4"]
 
 [project.optional-dependencies]
 dev = [

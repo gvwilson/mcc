@@ -1,8 +1,8 @@
 """Utility functions and constants for McCole."""
 
+import click
 from pathlib import Path
 import tomli
-import click
 
 # Default configuration file path
 DEFAULT_CONFIG_PATH = Path("pyproject.toml")
@@ -49,7 +49,7 @@ def read_config(config_file, verbose, src, dst):
         config,
         "skips",
         lambda cfg, key: key not in cfg or isinstance(cfg[key], list),
-        "'skips' in configuration must be a list of glob patterns"
+        "'skips' in configuration must be a list of glob patterns",
     )
 
     config["verbose"] = verbose
