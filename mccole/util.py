@@ -19,20 +19,18 @@ def find_files(config):
     src_path = Path(config["src"])
     markdown_files = []
     other_files = []
-    
-    # Get skip patterns from config
     skips = config["skips"]
-    
-    # Walk through all files in the source directory
+
     for path in src_path.rglob("*"):
-        if path.is_file():
-            if any(path.match(pat) for pat in skips):
-                pass
-            elif path.suffix.lower() == ".md":
-                markdown_files.append(path)
-            else:
-                other_files.append(path)
-                
+        if not path.is_file():
+            pass
+        elif any(path.match(pat) for pat in skips):
+            pass
+        elif path.suffix.lower() == ".md":
+            markdown_files.append(path)
+        else:
+            other_files.append(path)
+
     return markdown_files, other_files
 
 
@@ -40,30 +38,30 @@ def read_config(config_file, verbose, src, dst):
     """Read configuration from TOML file."""
     if not config_file.exists():
         raise click.FileError(str(config_file), hint="File not found")
-    
+
     with config_file.open("rb") as reader:
         toml_dict = tomli.load(reader)
-    
+
     config = toml_dict.get("tool", {}).get("mccole", {})
-    
+
     _check_config(
-        config_file, 
-        config, 
-        "skips", 
+        config_file,
+        config,
+        "skips",
         lambda cfg, key: key not in cfg or isinstance(cfg[key], list),
         "'skips' in configuration must be a list of glob patterns"
     )
-    
+
     config["verbose"] = verbose
     _build_config(config, "src", src, DEFAULT_SRC_PATH)
     _build_config(config, "dst", dst, DEFAULT_DST_PATH)
     _build_config(config, "skips", None, [])
-    
+
     return config
 
 
 def _build_config(config, key, cmdline, default):
-    """Set a configuration value with priority: 
+    """Set a configuration value with priority:
     command-line arg > config file > default."""
     if cmdline is not None:
         config[key] = cmdline

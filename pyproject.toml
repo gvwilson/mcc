@@ -9,6 +9,12 @@ authors = [
 requires-python = ">=3.11"
 dependencies = ["click", "tomli", "ruff"]
 
+[project.optional-dependencies]
+dev = [
+    "pyfakefs",
+    "pytest"
+]
+
 [project.scripts]
 mccole = "mccole:main"
 
