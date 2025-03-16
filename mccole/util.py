@@ -6,10 +6,34 @@ import click
 
 # Default configuration file path
 DEFAULT_CONFIG_PATH = Path("pyproject.toml")
+
 # Default source directory path
 DEFAULT_SRC_PATH = "src"
+
 # Default destination directory path
 DEFAULT_DST_PATH = "docs"
+
+
+def find_files(config):
+    """Find files in the source directory, returning (markdown, others)."""
+    src_path = Path(config["src"])
+    markdown_files = []
+    other_files = []
+    
+    # Get skip patterns from config
+    skips = config["skips"]
+    
+    # Walk through all files in the source directory
+    for path in src_path.rglob("*"):
+        if path.is_file():
+            if any(path.match(pat) for pat in skips):
+                pass
+            elif path.suffix.lower() == ".md":
+                markdown_files.append(path)
+            else:
+                other_files.append(path)
+                
+    return markdown_files, other_files
 
 
 def read_config(config_file, verbose, src, dst):
@@ -17,13 +41,23 @@ def read_config(config_file, verbose, src, dst):
     if not config_file.exists():
         raise click.FileError(str(config_file), hint="File not found")
     
-    with config_file.open("rb") as f:
-        toml_dict = tomli.load(f)
+    with config_file.open("rb") as reader:
+        toml_dict = tomli.load(reader)
     
     config = toml_dict.get("tool", {}).get("mccole", {})
+    
+    _check_config(
+        config_file, 
+        config, 
+        "skips", 
+        lambda cfg, key: key not in cfg or isinstance(cfg[key], list),
+        "'skips' in configuration must be a list of glob patterns"
+    )
+    
     config["verbose"] = verbose
     _build_config(config, "src", src, DEFAULT_SRC_PATH)
     _build_config(config, "dst", dst, DEFAULT_DST_PATH)
+    _build_config(config, "skips", None, [])
     
     return config
 
@@ -36,3 +70,9 @@ def _build_config(config, key, cmdline, default):
     elif key not in config:
         config[key] = default
     return config
+
+
+def _check_config(filename, config, key, check_func, error_msg):
+    """Check that a configuration value satisfies a condition."""
+    if not check_func(config, key):
+        raise ValueError(f"{error_msg} in {filename}")
