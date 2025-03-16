@@ -1,7 +1,6 @@
 """Check functionality for McCole."""
 
 from pathlib import Path
-import click
 
 from . import util
 
