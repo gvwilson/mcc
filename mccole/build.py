@@ -46,7 +46,8 @@ def _convert_markdowns(config, files):
     transformations = [
         _do_root_path_replacement,
         _do_bibliography_refs,
-        _do_glossary_refs
+        _do_glossary_refs,
+        _do_markdown_to_html_links
     ]
     src_path = Path(config["src"])
     dst_path = Path(config["dst"])
@@ -116,5 +117,20 @@ def _do_glossary_refs(soup, rel_path):
         if tag["href"].startswith("g:"):
             ref_id = tag["href"][2:]
             tag["href"] = f"{root_path}glossary.html#{ref_id}"
+
+    return soup
+
+
+def _do_markdown_to_html_links(soup, rel_path):
+    """Replace .md links with .html links."""
+    for tag in soup.find_all("a", href=True):
+        href = tag["href"]
+        if ".md" in href:
+            # Handle both simple .md and .md#anchor cases
+            if href.endswith(".md"):
+                tag["href"] = href[:-3] + ".html"
+            elif ".md#" in href:
+                # Replace .md with .html but preserve the anchor
+                tag["href"] = href.replace(".md#", ".html#")
 
     return soup

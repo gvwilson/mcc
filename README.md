@@ -23,6 +23,8 @@ Re-writing the McCole SSG from scratch using [Claude Code][claude].
     -   Also added tests and refactored when prompted to remove duplication.
     -   Though I was very specific about the refactoring I wanted.
     -   And refactored to loop over transformation functions correctly on the first try given a very specific prompt.
+1.  Claude added a function to convert `.md` to `.html` in links.
+    -   Added tests as well, but despite being ordered not to insert whitespace, did so.
 
 [claude]: https://docs.anthropic.com/en/docs/agents-and-tools/claude-code/overview
 [click]: https://click.palletsprojects.com/

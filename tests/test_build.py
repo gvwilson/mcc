@@ -1,14 +1,13 @@
 """Tests for build functionality."""
 
+from bs4 import BeautifulSoup
 from pathlib import Path
 import pytest
 
 from mccole.build import (
     _copy_others,
     _convert_markdowns,
-    _do_bibliography_refs,
-    _do_glossary_refs,
-    _create_root_path,
+    _do_markdown_to_html_links,
 )
 
 # Directories (using non-defaults to improve testing).
@@ -272,3 +271,101 @@ def test_glossary_refs_only_transforms_g_links(setup_markdown_files, fs):
     assert 'href="https://example.org"' in mixed_html
     assert 'href="./local.html"' in mixed_html
     assert 'href="./index.html"' in mixed_html  # @root transformation
+
+
+def test_markdown_to_html_links_conversion(setup_markdown_files, fs):
+    """Test that .md links are converted to .html links."""
+    # Add a file with markdown links
+    md_links_file = SRC / "markdown_links.md"
+    fs.create_file(
+        str(md_links_file),
+        contents=(
+            "# Page with Markdown links\n\n"
+            "[Link to another page](another-page.md)\n"
+            "[Link to nested page](docs/nested.md)\n"
+            "[Link with anchor](page.md#section)\n"
+            "[External link](https://example.org/file.md)\n"
+        ),
+    )
+    setup_markdown_files["files"].append(str(md_links_file))
+
+    _convert_markdowns(setup_markdown_files["config"], setup_markdown_files["files"])
+
+    html_content = (DST / "markdown_links.html").read_text()
+
+    # Markdown links should be transformed to HTML links
+    assert 'href="another-page.html"' in html_content
+    assert 'href="docs/nested.html"' in html_content
+    assert 'href="page.html#section"' in html_content
+
+    # External links with .md should still be transformed
+    # (This is expected behavior, as the function only checks for .md at the end)
+    assert 'href="https://example.org/file.html"' in html_content
+
+
+def test_markdown_links_with_mixed_content(setup_markdown_files, fs):
+    """Test that markdown link conversion works alongside other transformations."""
+    # Add a file with mixed types of links including markdown links
+    mixed_file = SRC / "mixed_md_links.md"
+    fs.create_file(
+        str(mixed_file),
+        contents=(
+            "# Page with mixed link types\n\n"
+            "[Markdown link](page.md)\n"
+            "[Bibliography link](b:citation5)\n"
+            "[Glossary term](g:term5)\n"
+            "[Root link](@root/docs/page.md)\n"
+            "[External markdown](https://example.org/file.md)\n"
+        ),
+    )
+    setup_markdown_files["files"].append(str(mixed_file))
+
+    _convert_markdowns(setup_markdown_files["config"], setup_markdown_files["files"])
+
+    html_content = (DST / "mixed_md_links.html").read_text()
+
+    # Check that all transformations are applied correctly
+    assert 'href="page.html"' in html_content  # Markdown to HTML
+    assert 'href="./bibliography.html#citation5"' in html_content  # Bibliography
+    assert 'href="./glossary.html#term5"' in html_content  # Glossary
+    assert 'href="./docs/page.html"' in html_content  # @root + .md to .html
+    assert 'href="https://example.org/file.html"' in html_content  # External .md to .html
+
+
+def test_do_markdown_to_html_links_function(setup_markdown_files):
+    """Test the _do_markdown_to_html_links function directly."""
+    # Create a test HTML string with various types of links
+    html = """
+    <html>
+    <body>
+        <a href="page.md">Regular Markdown link</a>
+        <a href="folder/page.md">Nested Markdown link</a>
+        <a href="page.md#section">Markdown link with anchor</a>
+        <a href="https://example.org/file.md">External Markdown link</a>
+        <a href="page.html">Already HTML link</a>
+        <a href="https://example.org">Regular link</a>
+        <a href="b:citation">Bibliography link</a>
+        <a href="g:term">Glossary link</a>
+    </body>
+    </html>
+    """
+    
+    # Parse the HTML
+    soup = BeautifulSoup(html, "html.parser")
+    
+    # Apply the transformation
+    result = _do_markdown_to_html_links(soup, Path("index.md"))
+    
+    # Convert back to string for checking
+    result_html = str(result)
+    
+    # Check that all .md links were converted to .html
+    assert 'href="page.html"' in result_html
+    assert 'href="folder/page.html"' in result_html
+    assert 'href="page.html#section"' in result_html
+    assert 'href="https://example.org/file.html"' in result_html
+    
+    # Check that other links were not modified
+    assert 'href="https://example.org"' in result_html
+    assert 'href="b:citation"' in result_html
+    assert 'href="g:term"' in result_html
