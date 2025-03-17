@@ -25,6 +25,8 @@ Re-writing the McCole SSG from scratch using [Claude Code][claude].
     -   And refactored to loop over transformation functions correctly on the first try given a very specific prompt.
 1.  Claude added a function to convert `.md` to `.html` in links.
     -   Added tests as well, but despite being ordered not to insert whitespace, did so.
+1.  Claude added code to use Jinja templates when converting Markdown to HTML.
+    -   Added tests as well, but they needed a bit of tidying up.
 
 [claude]: https://docs.anthropic.com/en/docs/agents-and-tools/claude-code/overview
 [click]: https://click.palletsprojects.com/

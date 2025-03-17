@@ -8,11 +8,13 @@ from mccole.build import (
     _copy_others,
     _convert_markdowns,
     _do_markdown_to_html_links,
+    _set_up_jinja,
 )
 
 # Directories (using non-defaults to improve testing).
 SRC = Path("/source")
 DST = Path("/dest")
+TEMPLATES = Path("/templates")
 
 
 @pytest.fixture
@@ -20,6 +22,8 @@ def setup_files(fs):
     """Set up test files and directories in the fake filesystem."""
     fs.create_dir(str(SRC))
     fs.create_dir(str(DST))
+    fs.create_dir(str(TEMPLATES))
+    fs.create_file(str(TEMPLATES / "page.html"), contents="<!DOCTYPE html>\n<html>\n<body>\n{{ content|safe }}\n</body>\n</html>")
 
     files = []
     files.append(fs.create_file(str(SRC / "file1.txt"), contents="file1 content"))
@@ -32,7 +36,7 @@ def setup_files(fs):
     files = [f.path for f in files]
 
     # Config uses strings for compatibility
-    config = {"src": SRC, "dst": DST, "verbose": False}
+    config = {"src": SRC, "dst": DST, "verbose": False, "templates": TEMPLATES}
 
     return {"files": files, "config": config}
 
@@ -42,6 +46,8 @@ def setup_markdown_files(fs):
     """Set up test Markdown files and directories in the fake filesystem."""
     fs.create_dir(str(SRC))
     fs.create_dir(str(DST))
+    fs.create_dir(str(TEMPLATES))
+    fs.create_file(str(TEMPLATES / "page.html"), contents="<!DOCTYPE html>\n<html>\n<body>\n{{ content|safe }}\n</body>\n</html>")
 
     files = []
     files.append(
@@ -67,7 +73,7 @@ def setup_markdown_files(fs):
     files = [f.path for f in files]
 
     # Config uses strings for compatibility
-    config = {"src": SRC, "dst": DST, "verbose": False}
+    config = {"src": SRC, "dst": DST, "verbose": False, "templates": TEMPLATES}
 
     return {"files": files, "config": config}
 
@@ -115,14 +121,16 @@ def test_copy_others_verbose_output(setup_files, capsys):
 
 def test_convert_markdowns_preserves_structure(setup_markdown_files):
     """Test that markdown files are converted with directory structure preserved."""
-    _convert_markdowns(setup_markdown_files["config"], setup_markdown_files["files"])
+    jinja_env = _set_up_jinja(setup_markdown_files["config"])
+    _convert_markdowns(setup_markdown_files["config"], jinja_env, setup_markdown_files["files"])
     assert (DST / "index.html").exists()
     assert (DST / "docs" / "page.html").exists()
 
 
 def test_convert_markdowns_converts_content(setup_markdown_files):
     """Test that markdown content is correctly converted to HTML."""
-    _convert_markdowns(setup_markdown_files["config"], setup_markdown_files["files"])
+    jinja_env = _set_up_jinja(setup_markdown_files["config"])
+    _convert_markdowns(setup_markdown_files["config"], jinja_env, setup_markdown_files["files"])
     index_html = (DST / "index.html").read_text()
     assert "<h1>Title</h1>" in index_html
     assert "<p>Some content." in index_html
@@ -138,21 +146,24 @@ def test_convert_markdowns_converts_content(setup_markdown_files):
 def test_convert_markdowns_creates_directories(fs, setup_markdown_files):
     """Test that directories are created as needed for markdown files."""
     fs.remove_object(str(DST))
-    _convert_markdowns(setup_markdown_files["config"], setup_markdown_files["files"])
+    jinja_env = _set_up_jinja(setup_markdown_files["config"])
+    _convert_markdowns(setup_markdown_files["config"], jinja_env, setup_markdown_files["files"])
     assert DST.exists()
     assert (DST / "docs").exists()
 
 
 def test_convert_markdowns_with_empty_list(setup_markdown_files):
     """Test that function works correctly with an empty file list."""
-    _convert_markdowns(setup_markdown_files["config"], [])
+    jinja_env = _set_up_jinja(setup_markdown_files["config"])
+    _convert_markdowns(setup_markdown_files["config"], jinja_env, [])
     assert len(list(DST.iterdir())) == 0
 
 
 def test_convert_markdowns_verbose_output(setup_markdown_files, capsys):
     """Test that verbose output is generated when verbose=True."""
     setup_markdown_files["config"]["verbose"] = True
-    _convert_markdowns(setup_markdown_files["config"], setup_markdown_files["files"])
+    jinja_env = _set_up_jinja(setup_markdown_files["config"])
+    _convert_markdowns(setup_markdown_files["config"], jinja_env, setup_markdown_files["files"])
     captured = capsys.readouterr()
     assert "Converted index.md to HTML" in captured.out
     assert "Converted docs/page.md to HTML" in captured.out
@@ -161,7 +172,8 @@ def test_convert_markdowns_verbose_output(setup_markdown_files, capsys):
 
 def test_root_replacement_at_different_depths(setup_markdown_files):
     """Test that @root is correctly replaced with the relative path to root based on file depth."""
-    _convert_markdowns(setup_markdown_files["config"], setup_markdown_files["files"])
+    jinja_env = _set_up_jinja(setup_markdown_files["config"])
+    _convert_markdowns(setup_markdown_files["config"], jinja_env, setup_markdown_files["files"])
 
     # Root directory (depth 0) - @root should be "./"
     index_html = (DST / "index.html").read_text()
@@ -179,7 +191,8 @@ def test_root_replacement_at_different_depths(setup_markdown_files):
 
 def test_bibliography_refs_at_different_depths(setup_markdown_files):
     """Test that b:id links are correctly replaced with bibliography.html#id based on file depth."""
-    _convert_markdowns(setup_markdown_files["config"], setup_markdown_files["files"])
+    jinja_env = _set_up_jinja(setup_markdown_files["config"])
+    _convert_markdowns(setup_markdown_files["config"], jinja_env, setup_markdown_files["files"])
 
     # Root directory (depth 0) - should link to ./bibliography.html
     index_html = (DST / "index.html").read_text()
@@ -196,7 +209,8 @@ def test_bibliography_refs_at_different_depths(setup_markdown_files):
 
 def test_glossary_refs_at_different_depths(setup_markdown_files):
     """Test that g:id links are correctly replaced with glossary.html#id based on file depth."""
-    _convert_markdowns(setup_markdown_files["config"], setup_markdown_files["files"])
+    jinja_env = _set_up_jinja(setup_markdown_files["config"])
+    _convert_markdowns(setup_markdown_files["config"], jinja_env, setup_markdown_files["files"])
 
     # Root directory (depth 0) - should link to ./glossary.html
     index_html = (DST / "index.html").read_text()
@@ -227,7 +241,8 @@ def test_bibliography_refs_only_transforms_b_links(setup_markdown_files, fs):
     )
     setup_markdown_files["files"].append(str(mixed_file))
 
-    _convert_markdowns(setup_markdown_files["config"], setup_markdown_files["files"])
+    jinja_env = _set_up_jinja(setup_markdown_files["config"])
+    _convert_markdowns(setup_markdown_files["config"], jinja_env, setup_markdown_files["files"])
 
     mixed_html = (DST / "mixed_links.html").read_text()
 
@@ -257,7 +272,8 @@ def test_glossary_refs_only_transforms_g_links(setup_markdown_files, fs):
     )
     setup_markdown_files["files"].append(str(mixed_file))
 
-    _convert_markdowns(setup_markdown_files["config"], setup_markdown_files["files"])
+    jinja_env = _set_up_jinja(setup_markdown_files["config"])
+    _convert_markdowns(setup_markdown_files["config"], jinja_env, setup_markdown_files["files"])
 
     mixed_html = (DST / "mixed_glossary_links.html").read_text()
 
@@ -289,7 +305,8 @@ def test_markdown_to_html_links_conversion(setup_markdown_files, fs):
     )
     setup_markdown_files["files"].append(str(md_links_file))
 
-    _convert_markdowns(setup_markdown_files["config"], setup_markdown_files["files"])
+    jinja_env = _set_up_jinja(setup_markdown_files["config"])
+    _convert_markdowns(setup_markdown_files["config"], jinja_env, setup_markdown_files["files"])
 
     html_content = (DST / "markdown_links.html").read_text()
 
@@ -320,7 +337,8 @@ def test_markdown_links_with_mixed_content(setup_markdown_files, fs):
     )
     setup_markdown_files["files"].append(str(mixed_file))
 
-    _convert_markdowns(setup_markdown_files["config"], setup_markdown_files["files"])
+    jinja_env = _set_up_jinja(setup_markdown_files["config"])
+    _convert_markdowns(setup_markdown_files["config"], jinja_env, setup_markdown_files["files"])
 
     html_content = (DST / "mixed_md_links.html").read_text()
 

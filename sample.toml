@@ -11,3 +11,4 @@ dependencies = ["click", "tomli"]
 
 [tool.mccole]
 skips = []
+templates = "templates"

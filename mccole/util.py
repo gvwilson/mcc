@@ -13,6 +13,12 @@ DEFAULT_SRC_PATH = "src"
 # Default destination directory path
 DEFAULT_DST_PATH = "docs"
 
+# Default templates directory path
+DEFAULT_TEMPLATES_PATH = "templates"
+
+# Default page template file
+DEFAULT_TEMPLATE_PAGE = "page.html"
+
 
 def find_files(config):
     """Find files in the source directory, returning (markdown, others)."""
@@ -56,6 +62,7 @@ def read_config(config_file, verbose, src, dst):
     _build_config(config, "src", src, DEFAULT_SRC_PATH)
     _build_config(config, "dst", dst, DEFAULT_DST_PATH)
     _build_config(config, "skips", None, [])
+    _build_config(config, "templates", None, DEFAULT_TEMPLATES_PATH)
 
     return config
 
