@@ -55,23 +55,34 @@ def _convert_markdowns(config, files):
             md_content = md_file.read()
 
         html_content = markdown.markdown(md_content, extensions=MARKDOWN_EXTENSIONS)
-        html_content = _do_root_path_replacement(html_content, rel_path)
+
+        # Parse HTML once to create DOM tree
+        soup = BeautifulSoup(html_content, "html.parser")
+
+        # Apply transformations to the DOM tree
+        soup = _do_root_path_replacement(soup, rel_path)
+        soup = _do_bibliography_refs(soup, rel_path)
+        soup = _do_glossary_refs(soup, rel_path)
+
+        # Convert back to HTML string
+        final_html = str(soup)
 
         with open(dest_file, "w") as html_file:
-            html_file.write(html_content)
+            html_file.write(final_html)
 
         if config["verbose"]:
             click.echo(f"Converted {rel_path} to HTML")
 
 
-def _do_root_path_replacement(html_content, rel_path):
-    """Replace @root/ with the relative path to the root directory in HTML content."""
-    # Calculate relative path to root
+def _create_root_path(rel_path):
+    """Calculate the relative path to the root directory."""
     depth = len(rel_path.parts) - 1
-    root_path = "../" * depth if depth > 0 else "./"
+    return "../" * depth if depth > 0 else "./"
 
-    # Parse HTML
-    soup = BeautifulSoup(html_content, "html.parser")
+
+def _do_root_path_replacement(soup, rel_path):
+    """Replace @root/ with the relative path to the root directory in HTML content."""
+    root_path = _create_root_path(rel_path)
 
     # Attributes that might need @root/ replacement
     attributes = ["href", "src"]
@@ -83,5 +94,28 @@ def _do_root_path_replacement(html_content, rel_path):
             if tag[attr].startswith("@root/"):
                 tag[attr] = tag[attr].replace("@root/", root_path)
 
-    # Convert back to HTML string
-    return str(soup)
+    return soup
+
+
+def _do_bibliography_refs(soup, rel_path):
+    """Replace b:something links with relative references to bibliography.html#something."""
+    root_path = _create_root_path(rel_path)
+
+    for tag in soup.find_all("a", href=True):
+        if tag["href"].startswith("b:"):
+            ref_id = tag["href"][2:]
+            tag["href"] = f"{root_path}bibliography.html#{ref_id}"
+
+    return soup
+
+
+def _do_glossary_refs(soup, rel_path):
+    """Replace g:something links with relative references to glossary.html#something."""
+    root_path = _create_root_path(rel_path)
+
+    for tag in soup.find_all("a", href=True):
+        if tag["href"].startswith("g:"):
+            ref_id = tag["href"][2:]
+            tag["href"] = f"{root_path}glossary.html#{ref_id}"
+
+    return soup

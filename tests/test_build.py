@@ -3,7 +3,13 @@
 from pathlib import Path
 import pytest
 
-from mccole.build import _copy_others, _convert_markdowns
+from mccole.build import (
+    _copy_others,
+    _convert_markdowns,
+    _do_bibliography_refs,
+    _do_glossary_refs,
+    _create_root_path,
+)
 
 # Directories (using non-defaults to improve testing).
 SRC = Path("/source")
@@ -42,21 +48,21 @@ def setup_markdown_files(fs):
     files.append(
         fs.create_file(
             str(SRC / "index.md"),
-            contents="# Title\n\nSome content.\n[Link to root](@root/index.html)",
+            contents="# Title\n\nSome content.\n[Link to root](@root/index.html)\n[Citation 1](b:citation1)\n[Glossary term](g:term1)",
         )
     )
     fs.create_dir(str(SRC / "docs"))
     files.append(
         fs.create_file(
             str(SRC / "docs" / "page.md"),
-            contents="## Subtitle\n\n- List item 1\n- List item 2\n<img src='@root/images/logo.png'>",
+            contents="## Subtitle\n\n- List item 1\n- List item 2\n<img src='@root/images/logo.png'>\n[Another citation](b:citation2)\n[Another term](g:term2)",
         )
     )
     fs.create_dir(str(SRC / "docs" / "subdir"))
     files.append(
         fs.create_file(
             str(SRC / "docs" / "subdir" / "deep.md"),
-            contents="### Deep page\n\n[Back to home](@root/index.html)\n[To page](@root/docs/page.html)",
+            contents="### Deep page\n\n[Back to home](@root/index.html)\n[To page](@root/docs/page.html)\n[Deep citation](b:citation3)\n[Deep term](g:term3)",
         )
     )
     files = [f.path for f in files]
@@ -170,3 +176,99 @@ def test_root_replacement_at_different_depths(setup_markdown_files):
     deep_html = (DST / "docs" / "subdir" / "deep.html").read_text()
     assert 'href="../../index.html"' in deep_html
     assert 'href="../../docs/page.html"' in deep_html
+
+
+def test_bibliography_refs_at_different_depths(setup_markdown_files):
+    """Test that b:id links are correctly replaced with bibliography.html#id based on file depth."""
+    _convert_markdowns(setup_markdown_files["config"], setup_markdown_files["files"])
+
+    # Root directory (depth 0) - should link to ./bibliography.html
+    index_html = (DST / "index.html").read_text()
+    assert 'href="./bibliography.html#citation1"' in index_html
+
+    # Depth 1 directory - should link to ../bibliography.html
+    page_html = (DST / "docs" / "page.html").read_text()
+    assert 'href="../bibliography.html#citation2"' in page_html
+
+    # Depth 2 directory - should link to ../../bibliography.html
+    deep_html = (DST / "docs" / "subdir" / "deep.html").read_text()
+    assert 'href="../../bibliography.html#citation3"' in deep_html
+
+
+def test_glossary_refs_at_different_depths(setup_markdown_files):
+    """Test that g:id links are correctly replaced with glossary.html#id based on file depth."""
+    _convert_markdowns(setup_markdown_files["config"], setup_markdown_files["files"])
+
+    # Root directory (depth 0) - should link to ./glossary.html
+    index_html = (DST / "index.html").read_text()
+    assert 'href="./glossary.html#term1"' in index_html
+
+    # Depth 1 directory - should link to ../glossary.html
+    page_html = (DST / "docs" / "page.html").read_text()
+    assert 'href="../glossary.html#term2"' in page_html
+
+    # Depth 2 directory - should link to ../../glossary.html
+    deep_html = (DST / "docs" / "subdir" / "deep.html").read_text()
+    assert 'href="../../glossary.html#term3"' in deep_html
+
+
+def test_bibliography_refs_only_transforms_b_links(setup_markdown_files, fs):
+    """Test that only b:id links are transformed and other links are left unchanged."""
+    # Add a file with both bibliography and normal links
+    mixed_file = SRC / "mixed_links.md"
+    fs.create_file(
+        str(mixed_file),
+        contents=(
+            "# Page with mixed links\n\n"
+            "[Bibliography link](b:citation4)\n"
+            "[Normal link](https://example.org)\n"
+            "[Relative link](./local.html)\n"
+            "[Root link](@root/index.html)"
+        ),
+    )
+    setup_markdown_files["files"].append(str(mixed_file))
+
+    _convert_markdowns(setup_markdown_files["config"], setup_markdown_files["files"])
+
+    mixed_html = (DST / "mixed_links.html").read_text()
+
+    # Bibliography link should be transformed
+    assert 'href="./bibliography.html#citation4"' in mixed_html
+
+    # Other links should be unchanged (except @root which is handled separately)
+    assert 'href="https://example.org"' in mixed_html
+    assert 'href="./local.html"' in mixed_html
+    assert 'href="./index.html"' in mixed_html  # @root transformation
+
+
+def test_glossary_refs_only_transforms_g_links(setup_markdown_files, fs):
+    """Test that only g:id links are transformed and other links are left unchanged."""
+    # Add a file with glossary and other link types
+    mixed_file = SRC / "mixed_glossary_links.md"
+    fs.create_file(
+        str(mixed_file),
+        contents=(
+            "# Page with mixed links\n\n"
+            "[Glossary term](g:term4)\n"
+            "[Bibliography link](b:citation4)\n"
+            "[Normal link](https://example.org)\n"
+            "[Relative link](./local.html)\n"
+            "[Root link](@root/index.html)"
+        ),
+    )
+    setup_markdown_files["files"].append(str(mixed_file))
+
+    _convert_markdowns(setup_markdown_files["config"], setup_markdown_files["files"])
+
+    mixed_html = (DST / "mixed_glossary_links.html").read_text()
+
+    # Glossary link should be transformed
+    assert 'href="./glossary.html#term4"' in mixed_html
+
+    # Bibliography link should also be transformed (by the bibliography handler)
+    assert 'href="./bibliography.html#citation4"' in mixed_html
+
+    # Other links should be unchanged (except @root which is handled separately)
+    assert 'href="https://example.org"' in mixed_html
+    assert 'href="./local.html"' in mixed_html
+    assert 'href="./index.html"' in mixed_html  # @root transformation
