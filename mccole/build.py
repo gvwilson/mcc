@@ -43,8 +43,14 @@ def _copy_others(config, files):
 
 def _convert_markdowns(config, files):
     """Convert Markdown files to HTML."""
+    transformations = [
+        _do_root_path_replacement,
+        _do_bibliography_refs,
+        _do_glossary_refs
+    ]
     src_path = Path(config["src"])
     dst_path = Path(config["dst"])
+
     for file_path in files:
         file_path = Path(file_path)
         rel_path = file_path.relative_to(src_path)
@@ -55,16 +61,9 @@ def _convert_markdowns(config, files):
             md_content = md_file.read()
 
         html_content = markdown.markdown(md_content, extensions=MARKDOWN_EXTENSIONS)
-
-        # Parse HTML once to create DOM tree
         soup = BeautifulSoup(html_content, "html.parser")
-
-        # Apply transformations to the DOM tree
-        soup = _do_root_path_replacement(soup, rel_path)
-        soup = _do_bibliography_refs(soup, rel_path)
-        soup = _do_glossary_refs(soup, rel_path)
-
-        # Convert back to HTML string
+        for transform in transformations:
+            soup = transform(soup, rel_path)
         final_html = str(soup)
 
         with open(dest_file, "w") as html_file:
