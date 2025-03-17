@@ -49,7 +49,8 @@ def _convert_markdowns(config, jinja_env, files):
         _do_root_path_replacement,
         _do_bibliography_refs,
         _do_glossary_refs,
-        _do_markdown_to_html_links
+        _do_markdown_to_html_links,
+        _do_h1_to_title
     ]
     src_path = Path(config["src"])
     dst_path = Path(config["dst"])
@@ -70,7 +71,9 @@ def _convert_markdowns(config, jinja_env, files):
             soup = transform(soup, rel_path)
 
         content = str(soup)
-        final_html = template.render(content=content, page_path=rel_path)
+        # Pass the title_text from the first H1 heading if available
+        page_title = getattr(soup, 'custom_title_text', 'Untitled')
+        final_html = template.render(content=content, page_path=rel_path, title=page_title)
 
         with open(dest_file, "w") as html_file:
             html_file.write(final_html)
@@ -127,16 +130,26 @@ def _do_markdown_to_html_links(soup, rel_path):
 def _do_root_path_replacement(soup, rel_path):
     """Replace @root/ with the relative path to the root directory in HTML content."""
     root_path = _create_root_path(rel_path)
-
-    # Attributes that might need @root/ replacement
     attributes = ["href", "src"]
-
-    # Loop through each attribute type
     for attr in attributes:
-        # Find all elements with this attribute
         for tag in soup.find_all(attrs={attr: True}):
             if tag[attr].startswith("@root/"):
                 tag[attr] = tag[attr].replace("@root/", root_path)
+
+    return soup
+
+
+def _do_h1_to_title(soup, rel_path):
+    """Copy the text from the unique H1 heading to the title element."""
+    h1_tags = soup.find_all("h1")
+
+    if not h1_tags:
+        click.echo(f"Warning: No H1 heading found in {rel_path}")
+    elif len(h1_tags) > 1:
+        click.echo(f"Warning: Multiple H1 headings found in {rel_path}")
+    else:
+        title_text = h1_tags[0].get_text()
+        setattr(soup, "custom_title_text", title_text)
 
     return soup
 

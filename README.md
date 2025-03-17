@@ -27,6 +27,7 @@ Re-writing the McCole SSG from scratch using [Claude Code][claude].
     -   Added tests as well, but despite being ordered not to insert whitespace, did so.
 1.  Claude added code to use Jinja templates when converting Markdown to HTML.
     -   Added tests as well, but they needed a bit of tidying up.
+1.  It took Claude several tries to move the multiline strings used in test cases to constants.
 
 [claude]: https://docs.anthropic.com/en/docs/agents-and-tools/claude-code/overview
 [click]: https://click.palletsprojects.com/
